@@ -196,7 +196,7 @@
                 "destination": me.destinationPlaceId,
                 "travelMode": me.travelMode
               };
-              renderDirections(map, response, request);
+              renderDirections(map, response.directions, request);
               //me.directionsDisplay.setDirections(response.json);
             },
             error: function(err) {
