@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Place Autocomplete</title>
+    <title>MyWaypoints</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <style>
       /* Always set the map height explicitly to define the size of the div
@@ -11,7 +12,7 @@
       #map {
         height: 100%;
       }
-      /* Optional: Makes the sample page fill the window. */
+      /* Makes the sample page fill the window. */
       html, body {
         height: 100%;
         margin: 0;
@@ -58,49 +59,113 @@
         font-weight: 300;
       }
 
-      /* #mode-selector {
-        color: #fff;
-        background-color: #4d90fe;
-        margin-left: 12px;
-        padding: 5px 11px 0px 11px;
+      #right-panel {
+        font-family: 'Roboto';
+        font-weight: 300;
+        position: absolute;
+        top: 0px;
+        right: 0px;
+        width: 28vw;
+        height: 100vh;
+        text-align: left;
+        overflow-y: scroll;
+        letter-spacing: 1px;
       }
 
-      #mode-selector label {
-        font-family: Roboto;
-        font-size: 13px;
+      #right-panel-head {
+        font-size: 36px;
+        padding-top: 20px; 
+        color: #2c387e;
+        font-weight: 500;
+      }
+
+      #right-panel-subhead{
+        padding-bottom: 20px; 
+      }
+
+      .weather-tile {
+        padding-bottom: 10px;
+      }
+
+      #map {
+        width: 70vw;
+      }
+
+      .weather-tile {
+        /* background-color: #3f51b5; */
+        padding: 18px;
+        margin: 12px;
+        
+        /* color: #eee; */
+        width: 20vw;
+        float: left;
+        border-radius: 2px;
+        box-shadow: 0 0 30px rgba(0,0,0,.05);
+        /* box-shadow: 0 5px 8px #555, 0 5px 8px #555; */
+      }
+
+      .city-name {
+        font-weight: 800
+      }
+
+      .tile-attr {
+        font-weight: 500;
+      }
+
+      #loader-shadow {
+        z-index: 99999999 !important;
+        background-color: #000;
+        width: 100vw;
+        height: 100vh;
+        opacity: 0.7;
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: none;
+
+      }
+
+      #loader-text {
+        color: #fff;
+        font-size: 6vw;
+        font-family: 'Roboto';
         font-weight: 300;
-      } */
+        text-align: center;
+        margin-top: 20%;
+      }
 
     </style>
   </head>
   <body>
-    <input id="origin-input" class="controls" type="text"
+
+    <div id='loader-shadow'>
+      <div id='loader-text'>
+        processing ...
+      </div>
+    </div>
+
+    <div id ='left-panel'>
+        <input id="origin-input" class="controls" type="text"
         placeholder="Enter an origin location">
 
-    <input id="destination-input" class="controls" type="text"
-        placeholder="Enter a destination location">
+        <input id="destination-input" class="controls" type="text"
+            placeholder="Enter a destination location">
 
-    <button id="go-button" class="controls" type="submit">GO</button>
-    
+        <button id="go-button" class="controls" type="submit">GO</button>
+    </div>
 
-    <!-- <div id="mode-selector" class="controls">
-      <input type="radio" name="type" id="changemode-walking" checked="checked">
-      <label for="changemode-walking">Walking</label>
+    <div id='right-panel'>
+      <div id='right-panel-head'>MyWayPoints</div>
+      <div id='right-panel-subhead'>Know the weather along the route!</div>
+      <div id='right-panel-output'></div>
+    </div>
 
-      <input type="radio" name="type" id="changemode-transit">
-      <label for="changemode-transit">Transit</label>
-
-      <input type="radio" name="type" id="changemode-driving">
-      <label for="changemode-driving">Driving</label>
-    </div> -->
 
     <div id="map"></div>
 
     <script>
-      // This example requires the Places library. Include the libraries=places
-      // parameter when you first load the API. For example:
-      // <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places">
       var renderer, map;
+      var markers = [];
       function initMap() {
           map = new google.maps.Map(document.getElementById('map'), {
           mapTypeControl: false,
@@ -132,10 +197,9 @@
             originInput, {placeIdOnly: true});
         var destinationAutocomplete = new google.maps.places.Autocomplete(
             destinationInput, {placeIdOnly: true});
-        // this.setupClickListener('changemode-walking', 'WALKING');
-        // this.setupClickListener('changemode-transit', 'TRANSIT');
+        // the requests are always considered in driving mode
+        // no other modes are supported in this application
         this.setupClickListener('go-button', 'DRIVING');
-
         this.setupPlaceChangedListener(originAutocomplete, 'ORIG');
         this.setupPlaceChangedListener(destinationAutocomplete, 'DEST');
 
@@ -171,16 +235,106 @@
             me.destinationPlaceId = place.place_id;
             me.destinationPlaceName = place.name;
           }
-          //me.route();
         });
 
       };
+
+      // to avoid "undefined" on user inteface
+      var cleanseInput = function(str) {
+        if (str == undefined) {
+          return "";
+        }
+        return str;
+      };
+
+      //Constructing Rain statemnet for display
+      var buildRainStatement = function(obj) {
+
+          if (obj === undefined) {
+            return ''
+          }
+          let objKey = Object.keys(obj)[0];
+          let objVal = Object.values(obj)[0];
+          let finalStr = 'Rain volume in last ' + objKey +  ' : ' + objVal + 'mm';
+          return finalStr;
+      };
+
+      // Constructs tiles to display weather with weather info
+      var buildSingleWeatherTile = function(data) {
+        console.log(data);
+    
+        let sunriseTime = new Date(data['sys']['sunrise']);
+        let sunsetTime = new Date(data['sys']['sunset']);
+        let tile = `<div class='weather-tile'>
+                      <div class='city-name'> <span class='tile-attr'>City: </span>
+                        ` + cleanseInput(data['name']) +`
+                      </div> 
+                      <div class='wind'>`
+                        + `<div class='wind-speed'><span class='tile-attr'>Wind Speed: </span>` + cleanseInput(data['wind']['speed']) + `</div>` +
+                      `</div> 
+                      <div class='cloudiness'><span class='tile-attr'>Cloudiness: </span>
+                        ` + cleanseInput(data['clouds']['all']) +` %
+                      </div> 
+                      <div class='rain'><span class='tile-attr'>Rain: </span>
+                        ` +cleanseInput(buildRainStatement(data['rain'])) + `
+                      </div> 
+                      
+                      <div class='min-temp'><span class='tile-attr'>Min Temp: </span>
+                        ` + cleanseInput(data['main']['temp_min']) +`
+                      </div> 
+                      <div class='sunset'><span class='tile-attr'>Max Temp: </span>
+                          ` + cleanseInput(data['main']['temp_max']) +`
+                      </div> 
+                      <div class='humidity'><span class='tile-attr'>Humidity: </span>
+                        ` + cleanseInput(data['main']['humidity']) +` %
+                      </div> 
+                    </div>`;
+          return tile;
+      };
+
+      function removeMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+            markers[i].setMap(null);
+        }
+        markers = [];
+      };
+
+      // Display weather info on the right
+      var renderWeatherData = function(weatherData) {
+        let weatherTiles = '';
+        weatherData.forEach(function(data){
+
+          if (data != null) {
+            weatherTiles += buildSingleWeatherTile(data);
+            // geo coords for displaying markers on the waypoints
+            let lat = data.coord.lat;
+            let lon = data.coord.lon;
+
+            var myLatLng = {lat: lat, lng: lon};
+            var marker = new google.maps.Marker({
+              position: myLatLng,
+              map: map,
+              title: data.name
+            });
+            markers.push(marker);
+          }
+        });
+        let rightPanel = document.getElementById('right-panel-output');
+        rightPanel.innerHTML = weatherTiles;
+      };
+
       var request;
       AutocompleteDirectionsHandler.prototype.route = function() {
         if (!this.originPlaceId || !this.destinationPlaceId) {
           return;
         }
         var me = this;
+
+        // delete existing markers
+        removeMarkers();
+        $('#loader-shadow').show();
+
+        // POST ajax call request to the server side to get route, waypoints and weather
         $.ajax({
             url: 'http://localhost:3000/map',
             type:"POST",
@@ -196,31 +350,19 @@
                 "destination": me.destinationPlaceId,
                 "travelMode": me.travelMode
               };
-              renderDirections(map, response.directions, request);
-              //me.directionsDisplay.setDirections(response.json);
+              renderWeatherData(response.weatherData);
+              renderDirections(map, response.routeObj, request);
+              $('#loader-shadow').hide();
             },
             error: function(err) {
               console.log("Ajax err");
               console.log(err);
+              $('#loader-shadow').hide();
             }
         });
-
-        // this.directionsService.route({
-        //   origin: {'placeId': this.originPlaceId},
-        //   destination: {'placeId': this.destinationPlaceId},
-        //   travelMode: this.travelMode
-        // }, function(response, status) {
-          
-        //   if (status === 'OK') {
-        //     console.log(response);
-            
-
-        //   } else {
-        //     window.alert('Directions request failed due to ' + status);
-        //   }
-        // });
       };
       
+      // function to display the directions on the map
       function renderDirections(map, response, request) {
         console.log('into renderDirection()');
         renderer.setOptions({
@@ -235,11 +377,10 @@
         });
       }
 
+
       function typecastRoutes(routes){
         routes.forEach(function(route){
           route.bounds = asBounds(route.bounds);
-          // I don't think `overview_path` is used but it exists on the
-          // response of DirectionsService.route()
           route.overview_path = asPath(route.overview_polyline);
           route.legs.forEach(function(leg){
             leg.start_location = asLatLng(leg.start_location);
