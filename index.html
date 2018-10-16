@@ -169,7 +169,7 @@
       function initMap() {
           map = new google.maps.Map(document.getElementById('map'), {
           mapTypeControl: false,
-          center: {lat: -33.8688, lng: 151.2195},
+          center: {lat: 42.880230, lng: -78.878738},
           zoom: 11
         });
         renderer = new google.maps.DirectionsRenderer();
@@ -408,7 +408,7 @@
         return google.maps.geometry.encoding.decodePath( encodedPolyObject.points );
       }
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAjj0bNxVgUF6IeSHBXdHLVEgWP9f6OCCs&libraries=places,geometry&callback=initMap"
+    <script src="https://maps.googleapis.com/maps/api/js?key=<API_KEY>&libraries=places,geometry&callback=initMap"
         async defer></script>
   </body>
 </html>
